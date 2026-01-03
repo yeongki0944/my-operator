@@ -1,0 +1,9 @@
+apiVersion: batch.my.domain/v1
+kind: JobOperator
+metadata:
+  labels:
+    app.kubernetes.io/name: my-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: joboperator-sample
+spec:
+  # TODO(user): Add fields here
