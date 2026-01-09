@@ -65,7 +65,7 @@ After starting the controller, you can verify metrics availability by accessing 
 3. Test your changes: Open a new terminal and apply sample CRs:
 
 ```bash
-kubectl apply -f config/samples/batch_v1_joboperator.yaml
+kubectl apply -n default -f config/samples/batch_v1_joboperator.yaml
 
 ```
 - Check metrics and logs as guided by the dev-start.sh/dev-start-kubectl.sh output.
