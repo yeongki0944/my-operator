@@ -29,8 +29,23 @@ func (o WaitOptions) withDefaults() WaitOptions {
 
 // WaitControllerManagerReady waits until controller-manager pod is Ready.
 // Assumes label selector "control-plane=controller-manager" (kubebuilder default).
-func WaitControllerManagerReady(ctx context.Context, logger slo.Logger, r CmdRunner, ns string, opts WaitOptions) error {
-	return WaitPodContainerReadyByLabel(ctx, logger, r, ns, "control-plane=controller-manager", 0, 0, opts)
+func WaitControllerManagerReady(
+	ctx context.Context,
+	logger slo.Logger,
+	r CmdRunner,
+	ns string,
+	opts WaitOptions,
+) error {
+	return WaitPodContainerReadyByLabel(
+		ctx,
+		logger,
+		r,
+		ns,
+		"control-plane=controller-manager",
+		0,
+		0,
+		opts,
+	)
 }
 
 // WaitPodContainerReadyByLabel waits until the first matching pod's Nth container is ready.
@@ -55,7 +70,11 @@ func WaitPodContainerReadyByLabel(
 	defer cancel()
 
 	// jsonpath -> stdout only (runner must preserve stdout-only on success)
-	jsonpath := fmt.Sprintf("{.items[%d].status.containerStatuses[%d].ready}", podIndex, containerIndex)
+	jsonpath := fmt.Sprintf(
+		"{.items[%d].status.containerStatuses[%d].ready}",
+		podIndex,
+		containerIndex,
+	)
 
 	ticker := time.NewTicker(opts.Interval)
 	defer ticker.Stop()
@@ -84,7 +103,12 @@ func WaitPodContainerReadyByLabel(
 	for {
 		select {
 		case <-waitCtx.Done():
-			return fmt.Errorf("timeout waiting pod ready (ns=%s selector=%q): %w", ns, labelSelector, waitCtx.Err())
+			return fmt.Errorf(
+				"timeout waiting pod ready (ns=%s selector=%q): %w",
+				ns,
+				labelSelector,
+				waitCtx.Err(),
+			)
 		case <-ticker.C:
 			ok, err := tryOnce()
 			if err != nil {
@@ -100,7 +124,14 @@ func WaitPodContainerReadyByLabel(
 }
 
 // WaitServiceHasEndpoints waits until the Endpoints object has at least one address.
-func WaitServiceHasEndpoints(ctx context.Context, logger slo.Logger, r CmdRunner, ns, svc string, opts WaitOptions) error {
+func WaitServiceHasEndpoints(
+	ctx context.Context,
+	logger slo.Logger,
+	r CmdRunner,
+	ns string,
+	svc string,
+	opts WaitOptions,
+) error {
 	logger = slo.NewLogger(logger)
 	if r == nil {
 		r = DefaultRunner{}
@@ -136,7 +167,12 @@ func WaitServiceHasEndpoints(ctx context.Context, logger slo.Logger, r CmdRunner
 	for {
 		select {
 		case <-waitCtx.Done():
-			return fmt.Errorf("timeout waiting endpoints (ns=%s svc=%s): %w", ns, svc, waitCtx.Err())
+			return fmt.Errorf(
+				"timeout waiting endpoints (ns=%s svc=%s): %w",
+				ns,
+				svc,
+				waitCtx.Err(),
+			)
 		case <-ticker.C:
 			ok, err := tryOnce()
 			if err != nil {
