@@ -51,12 +51,7 @@ type SpecsProvider func() []spec.SLISpec
 // - It does NOT read env vars.
 // - It does NOT know how to obtain token.
 // - It relies on providers to supply per-test deps + SLI specs.
-func Attach(
-	hdepsProvider func() HarnessDeps,
-	fdepsProvider func() FetchDeps,
-	specsProvider SpecsProvider,
-	fns CurlPodFns,
-) {
+func Attach(hdepsProvider func() HarnessDeps, fdepsProvider func() FetchDeps, specsProvider SpecsProvider, fns CurlPodFns) {
 	var sess *session
 	var enabled bool
 
@@ -81,16 +76,8 @@ func Attach(
 		} else {
 			specs = nil // empty: no SLI results, but summary still produced
 		}
-
-		var err error
-		sess, err = newSession(hdeps, fdeps, specs, fns)
-		if err != nil {
-			// instrumentation failure should NOT fail the test.
-			_, _ = fmt.Fprintf(GinkgoWriter, "SLO(v3): setup failed (skip): %v\n", err)
-			sess = nil
-			return
-		}
-
+		// 일단, sess 자체가 nil 이 나올 수 없음.
+		sess = newSession(hdeps, fdeps, specs, fns)
 		sess.Start()
 	})
 
@@ -115,7 +102,7 @@ type session struct {
 	started time.Time
 }
 
-func newSession(hdeps HarnessDeps, fdeps FetchDeps, specs []spec.SLISpec, fns CurlPodFns) (*session, error) {
+func newSession(hdeps HarnessDeps, fdeps FetchDeps, specs []spec.SLISpec, fns CurlPodFns) *session {
 	writer := summary.Writer(noopWriter{})
 	outPath := ""
 	if strings.TrimSpace(hdeps.ArtifactsDir) != "" {
@@ -151,7 +138,7 @@ func newSession(hdeps HarnessDeps, fdeps FetchDeps, specs []spec.SLISpec, fns Cu
 		},
 		runID: hdeps.RunID,
 		specs: specs,
-	}, nil
+	}
 }
 
 func (s *session) Start() {
