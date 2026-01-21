@@ -109,19 +109,23 @@ metadata:
 		cmd.Dir = rootDir
 		_, _ = runner.Run(ctx, logger, cmd)
 	})
-
+	// TODO opts *WaitOptions 로 할지 고민 중
 	BeforeEach(func() {
-		// 1) wait readiness first (token 자체는 꼭 필요하진 않지만, 전체 흐름상 여기서 안정화)
 		waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer waitCancel()
 
+		opts := kubeutil.WaitOptions{}
+
 		By("waiting controller-manager ready")
-		Expect(kubeutil.WaitControllerManagerReady(waitCtx, logger, runner, namespace, kubeutil.WaitOptions{})).To(Succeed())
+		Expect(
+			kubeutil.WaitControllerManagerReady(waitCtx, logger, runner, namespace, opts),
+		).To(Succeed())
 
 		By("waiting metrics service endpoints ready")
-		Expect(kubeutil.WaitServiceHasEndpoints(waitCtx, logger, runner, namespace, metricsServiceName, kubeutil.WaitOptions{})).To(Succeed())
+		Expect(
+			kubeutil.WaitServiceHasEndpoints(waitCtx, logger, runner, namespace, metricsServiceName, opts),
+		).To(Succeed())
 
-		// 2) request token (timeout은 cfg 사용)
 		tokCtx, tokCancel := context.WithTimeout(context.Background(), cfg.TokenRequestTimeout)
 		defer tokCancel()
 
