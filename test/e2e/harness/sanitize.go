@@ -1,4 +1,4 @@
-package instrumentv2
+package harness
 
 import "strings"
 

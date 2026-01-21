@@ -1,4 +1,3 @@
-// test/e2e/harness/attach.go
 package harness
 
 import (
@@ -13,7 +12,6 @@ import (
 	"github.com/yeongki/my-operator/pkg/slo/engine"
 	"github.com/yeongki/my-operator/pkg/slo/fetch"
 	"github.com/yeongki/my-operator/pkg/slo/fetch/promtext"
-	instrumentv2 "github.com/yeongki/my-operator/pkg/slo/instrumentv2"
 	"github.com/yeongki/my-operator/pkg/slo/spec"
 	"github.com/yeongki/my-operator/pkg/slo/summary"
 )
@@ -123,8 +121,8 @@ func newSession(hdeps HarnessDeps, fdeps FetchDeps, specs []spec.SLISpec, fns Cu
 	if strings.TrimSpace(hdeps.ArtifactsDir) != "" {
 		filename := fmt.Sprintf(
 			"sli-summary.v3.%s.%s.json",
-			instrumentv2.SanitizeFilename(hdeps.RunID),
-			instrumentv2.SanitizeFilename(hdeps.TestCase),
+			SanitizeFilename(hdeps.RunID),
+			SanitizeFilename(hdeps.TestCase),
 		)
 		outPath = filepath.Join(hdeps.ArtifactsDir, filename)
 		writer = summary.NewJSONFileWriter()
