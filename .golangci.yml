@@ -135,6 +135,11 @@ linters:
           - dupl
           - lll
         path: internal/*
+      # e2e에서는 ginkgo dot import를 허용 (staticcheck ST1001만 예외)
+      - linters:
+        - staticcheck
+        text: "ST1001"
+        path: test/e2e/
 
     # 린트에서 아예 제외할 경로 패턴(정규식)
     paths:
