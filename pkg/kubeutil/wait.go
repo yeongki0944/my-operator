@@ -69,7 +69,6 @@ func WaitPodContainerReadyByLabel(
 	waitCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	// jsonpath -> stdout only (runner must preserve stdout-only on success)
 	jsonpath := fmt.Sprintf(
 		"{.items[%d].status.containerStatuses[%d].ready}",
 		podIndex,
@@ -93,7 +92,6 @@ func WaitPodContainerReadyByLabel(
 		return strings.TrimSpace(out) == "true", nil
 	}
 
-	// immediate first try
 	if ok, err := tryOnce(); err == nil && ok {
 		return nil
 	} else if err != nil {
@@ -109,10 +107,10 @@ func WaitPodContainerReadyByLabel(
 				labelSelector,
 				waitCtx.Err(),
 			)
+
 		case <-ticker.C:
 			ok, err := tryOnce()
 			if err != nil {
-				// keep retrying; transient "not found" etc. are common during rollout
 				logger.Logf("wait pod ready: not ready yet: %v", err)
 				continue
 			}
@@ -157,7 +155,6 @@ func WaitServiceHasEndpoints(
 		return strings.TrimSpace(out) != "", nil
 	}
 
-	// immediate first try
 	if ok, err := tryOnce(); err == nil && ok {
 		return nil
 	} else if err != nil {
@@ -173,6 +170,7 @@ func WaitServiceHasEndpoints(
 				svc,
 				waitCtx.Err(),
 			)
+
 		case <-ticker.C:
 			ok, err := tryOnce()
 			if err != nil {

@@ -11,7 +11,10 @@ import (
 
 const (
 	PrometheusOperatorVersion = "v0.77.1"
-	prometheusOperatorURLTmpl = "https://github.com/prometheus-operator/prometheus-operator/releases/download/%s/bundle.yaml"
+
+	// Split to satisfy lll (max 120 chars) while keeping identical URL.
+	prometheusOperatorURLTmpl = "https://github.com/prometheus-operator/" +
+		"prometheus-operator/releases/download/%s/bundle.yaml"
 )
 
 func PrometheusOperatorURL() string {
@@ -22,7 +25,12 @@ func PrometheusOperatorURL() string {
 // - enabled=false이면 설치를 건너뛰고 nil 반환(테스트/운영에서 토글하기 쉬움).
 // - logger may be nil (no-op).
 // - r may be nil (uses DefaultRunner).
-func InstallPrometheusOperator(ctx context.Context, logger slo.Logger, r CmdRunner, enabled bool) error {
+func InstallPrometheusOperator(
+	ctx context.Context,
+	logger slo.Logger,
+	r CmdRunner,
+	enabled bool,
+) error {
 	logger = slo.NewLogger(logger)
 	if r == nil {
 		r = DefaultRunner{}
@@ -36,7 +44,10 @@ func InstallPrometheusOperator(ctx context.Context, logger slo.Logger, r CmdRunn
 	}
 
 	url := PrometheusOperatorURL()
-	logger.Logf("installing prometheus-operator version=%s", PrometheusOperatorVersion)
+	logger.Logf(
+		"installing prometheus-operator version=%s",
+		PrometheusOperatorVersion,
+	)
 
 	cmd := exec.Command("kubectl", "apply", "-f", url) // apply is idempotent
 	_, err := r.Run(ctx, logger, cmd)
@@ -46,7 +57,11 @@ func InstallPrometheusOperator(ctx context.Context, logger slo.Logger, r CmdRunn
 // UninstallPrometheusOperator uninstalls Prometheus Operator bundle.
 // - logger may be nil (no-op).
 // - r may be nil (uses DefaultRunner).
-func UninstallPrometheusOperator(ctx context.Context, logger slo.Logger, r CmdRunner) error {
+func UninstallPrometheusOperator(
+	ctx context.Context,
+	logger slo.Logger,
+	r CmdRunner,
+) error {
 	logger = slo.NewLogger(logger)
 	if r == nil {
 		r = DefaultRunner{}
@@ -56,9 +71,15 @@ func UninstallPrometheusOperator(ctx context.Context, logger slo.Logger, r CmdRu
 	}
 
 	url := PrometheusOperatorURL()
-	logger.Logf("uninstalling prometheus-operator version=%s", PrometheusOperatorVersion)
+	logger.Logf(
+		"uninstalling prometheus-operator version=%s",
+		PrometheusOperatorVersion,
+	)
 
-	cmd := exec.Command("kubectl", "delete", "-f", url, "--ignore-not-found=true")
+	cmd := exec.Command(
+		"kubectl", "delete", "-f", url,
+		"--ignore-not-found=true",
+	)
 	_, err := r.Run(ctx, logger, cmd)
 	return err
 }
@@ -66,7 +87,11 @@ func UninstallPrometheusOperator(ctx context.Context, logger slo.Logger, r CmdRu
 // IsPrometheusOperatorCRDsInstalled checks if Prometheus Operator CRDs exist.
 // - logger may be nil (no-op).
 // - r may be nil (uses DefaultRunner).
-func IsPrometheusOperatorCRDsInstalled(ctx context.Context, logger slo.Logger, r CmdRunner) bool {
+func IsPrometheusOperatorCRDsInstalled(
+	ctx context.Context,
+	logger slo.Logger,
+	r CmdRunner,
+) bool {
 	logger = slo.NewLogger(logger)
 	if r == nil {
 		r = DefaultRunner{}
@@ -82,16 +107,22 @@ func IsPrometheusOperatorCRDsInstalled(ctx context.Context, logger slo.Logger, r
 		"prometheusagents.monitoring.coreos.com",
 	}
 
-	cmd := exec.Command("kubectl", "get", "crds", "-o", "custom-columns=NAME:.metadata.name")
+	cmd := exec.Command(
+		"kubectl", "get", "crds",
+		"-o", "custom-columns=NAME:.metadata.name",
+	)
 	out, err := r.Run(ctx, logger, cmd)
 	if err != nil {
 		return false
 	}
 
-	lines := strings.Split(out, "\n")
-	for _, crd := range prometheusCRDs {
-		for _, line := range lines {
-			if strings.Contains(strings.TrimSpace(line), crd) {
+	for _, line := range strings.Split(out, "\n") {
+		s := strings.TrimSpace(line)
+		if s == "" {
+			continue
+		}
+		for _, crd := range prometheusCRDs {
+			if strings.Contains(s, crd) {
 				return true
 			}
 		}
