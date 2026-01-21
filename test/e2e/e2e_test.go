@@ -12,6 +12,7 @@ import (
 
 	"github.com/yeongki/my-operator/pkg/devutil"
 	"github.com/yeongki/my-operator/pkg/kubeutil"
+	"github.com/yeongki/my-operator/test/e2e/curlmetrics"
 	"github.com/yeongki/my-operator/test/e2e/harness"
 	e2eenv "github.com/yeongki/my-operator/test/e2e/internal/env"
 )
@@ -25,6 +26,8 @@ var _ = Describe("Manager", Ordered, func() {
 		cfg     e2eenv.Options
 		token   string
 		rootDir string
+
+		cm *curlmetrics.Client
 	)
 
 	BeforeAll(func() {
@@ -34,6 +37,8 @@ var _ = Describe("Manager", Ordered, func() {
 		var err error
 		rootDir, err = devutil.GetProjectDir()
 		Expect(err).NotTo(HaveOccurred())
+
+		cm = curlmetrics.New(logger, runner)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
@@ -45,25 +50,27 @@ var _ = Describe("Manager", Ordered, func() {
 			return out
 		}
 
-		By("creating manager namespace (idempotent)")
-		// kubectl create ns can fail if already exists; we prefer apply-ish semantics.
-		// Use: kubectl get ns || kubectl create ns
-		cmd := exec.Command("bash", "-lc", fmt.Sprintf(`kubectl get ns %s >/dev/null 2>&1 || kubectl create ns %s`, namespace, namespace))
-		run(cmd, "Failed to create namespace")
+		By("creating manager namespace (idempotent via apply)")
+		nsManifest := fmt.Sprintf(`apiVersion: v1
+kind: Namespace
+metadata:
+  name: %s
+`, namespace)
+		cmd := exec.Command("kubectl", "apply", "-f", "-")
+		cmd.Dir = rootDir
+		cmd.Stdin = strings.NewReader(nsManifest)
+		run(cmd, "Failed to apply namespace")
 
 		By("labeling the namespace to enforce the security policy")
-		cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
-			"pod-security.kubernetes.io/enforce=baseline")
-		_, err = runner.Run(ctx, logger, cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with security policy")
+		cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace, "pod-security.kubernetes.io/enforce=baseline")
+		cmd.Dir = rootDir
+		run(cmd, "Failed to label namespace with security policy")
 
 		By("installing CRDs")
-		cmd = exec.Command("make", "install")
-		run(cmd, "Failed to install CRDs")
+		run(exec.Command("make", "install"), "Failed to install CRDs")
 
 		By("deploying the controller-manager")
-		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
-		run(cmd, "Failed to deploy the controller-manager")
+		run(exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage)), "Failed to deploy the controller-manager")
 
 		By("ensuring metrics reader RBAC for controller-manager SA (idempotent)")
 		Expect(kubeutil.ApplyClusterRoleBinding(
@@ -84,8 +91,8 @@ var _ = Describe("Manager", Ordered, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
-		By("best-effort: cleaning up curl-metrics pods for metrics")
-		cleanupCurlMetricsPods(namespace)
+		By("best-effort: cleaning up curl-metrics pods")
+		_ = cm.CleanupByLabel(ctx, namespace)
 
 		By("undeploying the controller-manager (best-effort)")
 		cmd := exec.Command("make", "undeploy")
@@ -98,25 +105,31 @@ var _ = Describe("Manager", Ordered, func() {
 		_, _ = runner.Run(ctx, logger, cmd)
 
 		By("removing manager namespace (best-effort)")
-		cmd = exec.Command("kubectl", "delete", "ns", namespace)
+		cmd = exec.Command("kubectl", "delete", "ns", namespace, "--ignore-not-found=true")
+		cmd.Dir = rootDir
 		_, _ = runner.Run(ctx, logger, cmd)
 	})
 
 	BeforeEach(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.TokenRequestTimeout)
-		defer cancel()
+		// 1) wait readiness first (token 자체는 꼭 필요하진 않지만, 전체 흐름상 여기서 안정화)
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer waitCancel()
+
+		By("waiting controller-manager ready")
+		Expect(kubeutil.WaitControllerManagerReady(waitCtx, logger, runner, namespace, kubeutil.WaitOptions{})).To(Succeed())
+
+		By("waiting metrics service endpoints ready")
+		Expect(kubeutil.WaitServiceHasEndpoints(waitCtx, logger, runner, namespace, metricsServiceName, kubeutil.WaitOptions{})).To(Succeed())
+
+		// 2) request token (timeout은 cfg 사용)
+		tokCtx, tokCancel := context.WithTimeout(context.Background(), cfg.TokenRequestTimeout)
+		defer tokCancel()
 
 		By("requesting service account token")
-		t, err := kubeutil.ServiceAccountToken(ctx, logger, runner, namespace, serviceAccountName)
+		t, err := kubeutil.ServiceAccountToken(tokCtx, logger, runner, namespace, serviceAccountName)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(t).NotTo(BeEmpty())
 		token = t
-
-		By("waiting controller-manager ready")
-		waitControllerManagerReady(namespace)
-
-		By("waiting metrics service endpoints ready")
-		waitServiceHasEndpoints(namespace, metricsServiceName)
 	})
 
 	harness.Attach(
@@ -139,23 +152,46 @@ var _ = Describe("Manager", Ordered, func() {
 		},
 		harness.DefaultV3Specs,
 		harness.CurlPodFns{
-			RunCurlMetricsOnce:  runCurlMetricsOnce,
-			WaitCurlMetricsDone: waitCurlMetricsDone,
-			CurlMetricsLogs:     curlMetricsLogs,
-			DeletePodNoWait:     deletePodNoWait,
+			// harness가 기존 함수 타입을 기대한다면, 여기서 얇게 어댑트만 유지
+			RunCurlMetricsOnce: func(ns, token, metricsSvcName, sa string) (string, error) {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				defer cancel()
+				return cm.RunOnce(ctx, ns, token, metricsSvcName, sa)
+			},
+			WaitCurlMetricsDone: func(ns, podName string) {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				defer cancel()
+				Expect(cm.WaitDone(ctx, ns, podName, 2*time.Second)).To(Succeed())
+			},
+			CurlMetricsLogs: func(ns, podName string) (string, error) {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				defer cancel()
+				return cm.Logs(ctx, ns, podName)
+			},
+			DeletePodNoWait: func(ns, podName string) error {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				return cm.DeletePodNoWait(ctx, ns, podName)
+			},
 		},
 	)
 
 	It("should ensure the metrics endpoint is serving metrics", func() {
 		By("scraping /metrics via curl pod")
 
-		podName, err := runCurlMetricsOnce(namespace, token, metricsServiceName, serviceAccountName)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		podName, err := cm.RunOnce(ctx, namespace, token, metricsServiceName, serviceAccountName)
 		Expect(err).NotTo(HaveOccurred())
 
-		waitCurlMetricsDone(namespace, podName)
+		defer func() { _ = cm.DeletePodNoWait(context.Background(), namespace, podName) }()
 
-		text, err := curlMetricsLogs(namespace, podName)
-		_ = deletePodNoWait(namespace, podName)
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer waitCancel()
+		Expect(cm.WaitDone(waitCtx, namespace, podName, 2*time.Second)).To(Succeed())
+
+		text, err := cm.Logs(ctx, namespace, podName)
 		Expect(err).NotTo(HaveOccurred())
 
 		if !strings.Contains(text, "controller_runtime_reconcile_total") {
