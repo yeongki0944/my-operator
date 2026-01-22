@@ -38,6 +38,7 @@ func GetProjectDir() (string, error) {
 	return wd, errors.New("project root not found (no go.mod/.git upwards); returning cwd may be incorrect")
 }
 
+// findUpwards searches for marker file/directory by walking up from start directory.
 func findUpwards(start string, marker string) (string, bool) {
 	dir := filepath.Clean(start)
 	for {
@@ -52,6 +53,7 @@ func findUpwards(start string, marker string) (string, bool) {
 	}
 }
 
+// exists checks if the given path exists.
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
