@@ -61,7 +61,7 @@ var _ = Describe("Manager", Ordered, func() {
 		// TODO apply.go 에서 ApplyTemplate 적용할 지 고민중
 		nsManifest, err := devutil.RenderTemplateFileString(
 			rootDir,
-			"test/e2e/manifests/namespace.tmpl.yaml",
+			"test/e2e/manifests/namespace.tmpl.yaml.gotmpl",
 			manifests.NamespaceData{Namespace: namespace},
 		)
 		Expect(err).NotTo(HaveOccurred())

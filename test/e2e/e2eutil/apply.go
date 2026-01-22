@@ -24,7 +24,7 @@ type Runner interface {
 
 // ApplyTemplate renders a manifest template file and applies it via `kubectl apply -f -`.
 // - rootDir: repo root (used for template read + cmd.Dir)
-// - relPath: template path relative to rootDir (e.g., "test/e2e/manifests/namespace.tmpl.yaml")
+// - relPath: template path relative to rootDir (e.g., "test/e2e/manifests/namespace.tmpl.yaml.gotmpl")
 // - data: template data (struct/map)
 // Returns kubectl stdout for debugging.
 func ApplyTemplate(
