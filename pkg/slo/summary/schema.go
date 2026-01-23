@@ -30,6 +30,7 @@ type RunConfig struct {
 	FinishedAt time.Time         `json:"finishedAt"`
 	Mode       RunMode           `json:"mode"`
 	Tags       map[string]string `json:"tags,omitempty"`
+	Format     string            `json:"format,omitempty"`
 
 	// EvidencePaths points to raw artifacts (optional).
 	EvidencePaths map[string]string `json:"evidencePaths,omitempty"`
