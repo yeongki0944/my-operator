@@ -65,6 +65,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 				Trigger:  cfg.Mode.Trigger,
 			},
 			Tags:          cfg.Tags,
+			Format:        cfg.Format,
 			EvidencePaths: cfg.EvidencePaths,
 		},
 	}
@@ -101,6 +102,7 @@ func (e *Engine) emptySummary(cfg RunConfig, warnings []string) *summary.Summary
 			FinishedAt:    cfg.FinishedAt,
 			Mode:          summary.RunMode{Location: cfg.Mode.Location, Trigger: cfg.Mode.Trigger},
 			Tags:          cfg.Tags,
+			Format:        cfg.Format,
 			EvidencePaths: cfg.EvidencePaths,
 		},
 		Results:  []summary.SLIResult{},

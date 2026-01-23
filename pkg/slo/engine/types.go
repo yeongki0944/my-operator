@@ -18,6 +18,7 @@ type RunConfig struct {
 	Mode       RunMode
 
 	Tags          map[string]string
+	Format        string
 	EvidencePaths map[string]string
 }
 
