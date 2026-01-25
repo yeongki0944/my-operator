@@ -1,49 +1,160 @@
 version: "2"
+
+# ------------------------------------------------------------------------------
+# Run options
+# ------------------------------------------------------------------------------
 run:
+  # 여러 패키지를 병렬로 분석해서 속도를 높인다.
   allow-parallel-runners: true
+
+# ------------------------------------------------------------------------------
+# Linters: 어떤 린터를 켤지 + 린터별 설정
+# ------------------------------------------------------------------------------
 linters:
+  # 기본 린터 묶음은 끄고(=none), 아래 enable 목록만 명시적으로 켠다.
   default: none
+
   enable:
+    # Go 1.22+에서 for-range 변수 캡처 문제를 잡아주는 린터
     - copyloopvar
+
+    # 중복 코드 감지
     - dupl
+
+    # import 규칙(아키텍처 경계) 강제
+    - depguard
+
+    # 에러 반환값 체크 누락 검출
     - errcheck
+
+    # ginkgo 테스트 패턴/안티패턴 검출
     - ginkgolinter
+
+    # 상수로 뺄 수 있는 값 검출
     - goconst
+
+    # cyclomatic complexity(복잡도) 제한
     - gocyclo
+
+    # go vet(정적 분석)
     - govet
+
+    # 할당했지만 사용하지 않는 값 등
     - ineffassign
+
+    # 라인 길이 제한(기본 120 또는 설정값에 따름)
     - lll
+
+    # 오타 교정
     - misspell
+
+    # naked return(가독성 저하) 검출
     - nakedret
+
+    # slice 미리 할당 권장
     - prealloc
+
+    # 스타일/규칙 기반 린터(설정 가능)
     - revive
+
+    # staticcheck(강력한 정적 분석)
     - staticcheck
+
+    # 불필요한 형변환 검출
     - unconvert
+
+    # 사용되지 않는 파라미터 검출
     - unparam
+
+    # 사용되지 않는 변수/함수 등(Go 분석 기반)
     - unused
+
+  # ----------------------------------------------------------------------------
+  # Linters settings
+  # (주의) golangci-lint v2에서는 보통 `linters.settings` 아래에 린터별 설정을 둔다.
+  # ----------------------------------------------------------------------------
   settings:
+    # --------------------------------------------------------------------------
+    # depguard: pkg/slo(core domain)를 Kubernetes 의존성으로부터 보호
+    # --------------------------------------------------------------------------
+    depguard:
+      rules:
+        # 규칙 이름: lint 에러 로그에 이 이름이 그대로 찍힌다.
+        slo_core_boundary:
+          # 검사 대상: pkg/slo 하위의 모든 Go 파일(재귀)
+          files:
+            - "pkg/slo/**/*.go"
+
+          # 허용 목록(Allow):
+          # allow를 쓰면 "허용된 import만" 인정하는 방향으로 경계가 더 명확해진다.
+          # - $gostd: Go 표준 라이브러리 전체 허용
+          # - prom client: 메트릭 정의/Observe를 위해 허용
+          allow:
+            - "$gostd"  # Go 표준 라이브러리 허용
+            - "github.com/prometheus/client_golang/prometheus"  # 프로메테우스 허용
+            # 필요 시 검토하여 추가(사용하는 경우만):
+            # - "github.com/prometheus/client_golang/prometheus/promauto"
+            # - "github.com/prometheus/client_golang/prometheus/promhttp"
+
+          # 금지 목록(Deny):
+          # pkg/slo는 K8s-independent core여야 하므로 K8s/controller-runtime/logr/klog 금지
+          deny:
+            - pkg: "k8s.io/**"
+              desc: "pkg/slo는 Kubernetes에 의존하지 않는다. K8s 코드는 Glue Layer로 분리한다."
+            - pkg: "sigs.k8s.io/**"
+              desc: "controller-runtime 의존성은 Core Domain에서 금지된다."
+            - pkg: "github.com/go-logr/**"
+              desc: "로깅은 인터페이스로 추상화한다."
+            - pkg: "k8s.io/klog/**"
+              desc: "pkg/slo는 klog에 의존하지 않는다."
+
+    # --------------------------------------------------------------------------
+    # revive: 룰 기반 스타일/품질 검사
+    # --------------------------------------------------------------------------
     revive:
       rules:
         - name: comment-spacings
         - name: import-shadowing
+
+  # ----------------------------------------------------------------------------
+  # Exclusions: 특정 경로/파일에 대해 린터를 느슨하게 적용
+  # ----------------------------------------------------------------------------
   exclusions:
+    # generated 코드는 일반적으로 린트 강도를 낮추는 편이 안전하다.
     generated: lax
+
+    # 특정 경로에 대해 특정 린터를 제외
     rules:
+      # api/ 아래는 라인 길이(lll)만 예외
       - linters:
           - lll
         path: api/*
+
+      # internal/ 아래는 중복(dupl) 및 라인 길이(lll) 예외
       - linters:
           - dupl
           - lll
         path: internal/*
+      # e2e에서는 ginkgo dot import를 허용 (staticcheck ST1001만 예외)
+      - linters:
+        - staticcheck
+        text: "ST1001"
+        path: test/e2e/
+
+    # 린트에서 아예 제외할 경로 패턴(정규식)
     paths:
       - third_party$
       - builtin$
       - examples$
+
+# ------------------------------------------------------------------------------
+# Formatters: 코드 포맷터 설정
+# ------------------------------------------------------------------------------
 formatters:
   enable:
     - gofmt
     - goimports
+
   exclusions:
     generated: lax
     paths:

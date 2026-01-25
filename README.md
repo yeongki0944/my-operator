@@ -35,6 +35,41 @@ make lint
 **NOTE:** The same version and configuration are used in CI,
 ensuring consistent results between local development and GitHub Actions.
 
+### Local Development (Quick Start)
+For rapid iteration, we provide a Developer Entrypoint Script. This script performs safety checks (cluster existence, context validation), installs CRDs, and guides you through the running loop.
+
+1. Setup your local environment:
+
+```bash
+# Checks prerequisites, installs CRDs, and waits for them to be established
+./hack/dev-start.sh
+# or
+# ./hack/dev-start-kubectl.sh
+```
+2. Run the controller locally:
+
+By default, the metrics endpoint is disabled for security reasons.  
+For local development, it is recommended to explicitly enable the metrics endpoint when running the controller.    
+
+Run the controller with the following command:
+
+```bash
+make run ARGS="--metrics-bind-address=:8080 --metrics-secure=false"
+```
+With this configuration:
+- Health and readiness probes are exposed on port 8081.  
+- Prometheus metrics are exposed on http://localhost:8080/metrics  
+
+After starting the controller, you can verify metrics availability by accessing the metrics endpoint directly from your local machine.  
+
+3. Test your changes: Open a new terminal and apply sample CRs:
+
+```bash
+kubectl apply -n default -f config/samples/batch_v1_joboperator.yaml
+
+```
+- Check metrics and logs as guided by the dev-start.sh/dev-start-kubectl.sh output.
+
 ### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**
 

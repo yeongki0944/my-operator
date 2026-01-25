@@ -6,4 +6,8 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: joboperator-sample
 spec:
-  # TODO(user): Add fields here
+  # NOTE: JobOperatorSpec currently defines these fields (image is effectively required).
+  # This sample keeps minimal valid values so `kubectl apply` and e2e smoke tests work.
+  image: nginx:1.25
+  replicas: 1
+  port: 8080
